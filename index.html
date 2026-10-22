@@ -398,7 +398,26 @@ async function refresh(){const snap=await getDoc(stateRef);if(!snap.exists()){if
  const val=snap.data();if(!Number.isSafeInteger(val.revision)||!V.validV6(val.payload))throw Error('Structure de caisse invalide.');revision=val.revision;V.cloudLoad(val.payload,revision);if(role==='admin')await publishPersonalSnapshots()}
 window.popotteCloud={refresh,async commit(payload,expected){if(!user)throw Error('Non connecté');if(!V.validV6(payload))throw Error('Données invalides');if(JSON.stringify(payload).length>700000)throw Error('Limite de taille proche : exporte le JSON et contacte un administrateur');writing=true;
  try{const next=await runTransaction(db,async tx=>{const snap=await tx.get(stateRef);if(!snap.exists()||snap.data().revision!==expected)throw Error('Un autre gestionnaire a modifié la caisse. Recharge les données et recommence.');const next=expected+1;tx.update(stateRef,{revision:next,payload,updatedAt:serverTimestamp(),updatedBy:user.uid});tx.set(doc(collection(db,'audit')),{actor:user.uid,at:serverTimestamp(),revision:next,kind:'modification',summary:{people:payload.people.length,operations:payload.operations.length,packs:payload.packs.length}});return next});revision=next;if(role==='admin')await publishPersonalSnapshots();queueMicrotask(()=>reconcileDrinkEvents().catch(console.warn));return next}finally{writing=false}}};
-$('authForm').addEventListener('submit',async e=>{e.preventDefault();message('Connexion en cours…');try{await signInWithEmailAndPassword(auth,loginIdentifier($('authEmail').value),$('authPassword').value)}catch(err){message('Connexion impossible : '+err.message)}});
+$('authForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const submit=$('authForm').querySelector('[type="submit"]');
+ if(submit)submit.disabled=true;
+ let completed=false;
+ const warning=setTimeout(()=>{
+  if(!completed)message('La connexion prend trop de temps. Vérifie ta connexion Internet, puis recharge la page. Si le problème persiste, communique ce message à l’administrateur.');
+ },12000);
+ message('Connexion en cours…');
+ try{
+  const credential=await signInWithEmailAndPassword(auth,loginIdentifier($('authEmail').value),$('authPassword').value);
+  completed=true;
+  message('Identité vérifiée. Chargement de ton espace…');
+  // Un changement d'état Firebase doit suivre. On évite de rester sans indication.
+  setTimeout(()=>{if($('authScreen').hidden===false&&auth.currentUser?.uid===credential.user.uid&&$('authError').textContent.includes('Chargement de ton espace'))message('Connexion réussie, mais l’espace ne s’ouvre pas. Vérifie les autorisations Firestore et recharge la page.');},10000);
+ }catch(err){
+  completed=true;
+  message('Connexion impossible : '+(err.code||'')+' '+err.message);
+ }finally{clearTimeout(warning);if(submit)submit.disabled=false}
+});
 $('showSignup').onclick=()=>{$('signupForm').hidden=false;$('authForm').hidden=true;$('showSignup').hidden=true;message('');};
 $('cancelSignup').onclick=()=>{$('signupForm').hidden=true;$('authForm').hidden=false;$('showSignup').hidden=false;message('');};
 $('signupForm').addEventListener('submit',async e=>{
@@ -542,11 +561,9 @@ async function loadPendingRequests(){
 }
 document.querySelector('[data-tab="settings"]').addEventListener('click',()=>{if(role==='admin')Promise.all([loadPendingRequests(),loadManagers(),loadConsumptionQueue()]).catch(err=>alert(err.message));});
 $('managerForm').addEventListener('submit',async e=>{e.preventDefault();const id=$('managerUid').value.trim(),r=$('managerRole').value;if(!/^[A-Za-z0-9]{10,128}$/.test(id)){alert('UID invalide');return}if(id===user.uid){alert('Ne modifie pas ton propre rôle ici');return}try{await setDoc(doc(db,'managers',id),{role:r,active:true});$('managerForm').reset();await loadManagers()}catch(err){alert('Autorisation impossible : '+err.message)}});
-onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=current;role=null;lock();if(!current){message('');return}message('Vérification des autorisations…');try{const profile=await getDoc(doc(db,'managers',current.uid));if(!profile.exists()||profile.data().active!==true||!['admin','manager'].includes(profile.data().role)){const request=await getDoc(doc(db,'accessRequests',current.uid));throw Error(request.exists()?(request.data().status==='pending'?'Demande d’accès en attente de validation par un administrateur.':'Accès retiré ou désactivé. Contacte un administrateur.'):'Compte non autorisé. Contacte un administrateur.');}role=profile.data().role;
- const contactSnap=await getDoc(doc(db,'accessRequests',current.uid));
- const contact=contactSnap.exists()?contactSnap.data():{};
- $('connectedName').textContent=contact.name||current.email||'Compte connecté';
- $('connectedRole').textContent=role==='admin'?'· Administrateur':'· Utilisateur (droits provisoires)';
+onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=current;role=null;lock();if(!current){message('');return}message('Connexion établie. Vérification des autorisations…');try{const profile=await getDoc(doc(db,'managers',current.uid));if(!profile.exists()||profile.data().active!==true||!['admin','manager'].includes(profile.data().role)){const request=await getDoc(doc(db,'accessRequests',current.uid));throw Error(request.exists()?(request.data().status==='pending'?'Demande d’accès en attente de validation par un administrateur.':'Accès retiré ou désactivé. Contacte un administrateur.'):'Compte non autorisé. Contacte un administrateur.');}role=profile.data().role;
+ $('connectedName').textContent=current.email?.endsWith('@users.popotte.invalid')?current.email.split('@')[0]:(current.email||'Compte connecté');
+ $('connectedRole').textContent=role==='admin'?'· Administrateur':'· Utilisateur';
  if(role==='manager'){
   const personId=profile.data().personId;
   if(typeof personId!=='string'||!personId)throw Error('Aucune fiche collègue associée à ce compte. Contacte un administrateur.');
