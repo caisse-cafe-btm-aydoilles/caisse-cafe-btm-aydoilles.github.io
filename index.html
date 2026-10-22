@@ -81,10 +81,10 @@ button.primary,.primary{background:#1265c2;color:white}button:hover{filter:brigh
     </div>
   </div>
 </header>
-<div id="cloudBar" hidden><span id="cloudStatus">Connexion…</span><button id="signOut" type="button">Déconnexion</button></div>
-<div id="authScreen"><div id="authCard"><h2>☕ POPOTTE V6.1</h2><p>Connexion et demandes d’accès à la caisse</p><form id="authForm"><label>Adresse e-mail<input id="authEmail" type="email" required autocomplete="username"></label><label>Mot de passe<input id="authPassword" type="password" required autocomplete="current-password"></label><button class="primary" type="submit">Se connecter</button></form><p><button id="showSignup" type="button">Créer un compte / demander un accès</button></p>
+<div id="cloudBar" hidden><span><strong id="connectedName">Compte connecté</strong> <small id="connectedRole"></small> · <span id="cloudStatus">Connexion…</span></span><button id="signOut" type="button">Déconnexion</button></div>
+<div id="authScreen"><div id="authCard"><h2>☕ Caisse Café BTM Aydoilles</h2><p>Connexion et demandes d’accès à la caisse</p><form id="authForm"><label>Adresse e-mail<input id="authEmail" type="email" required autocomplete="username"></label><label>Mot de passe<input id="authPassword" type="password" required autocomplete="current-password"></label><button class="primary" type="submit">Se connecter</button></form><p><button id="showSignup" type="button">Créer un compte / demander un accès</button></p>
 <form id="signupForm" hidden><label>Nom ou prénom d’affichage<input id="signupName" type="text" minlength="2" maxlength="80" autocomplete="name" required></label><label>Adresse e-mail<input id="signupEmail" type="email" autocomplete="email" required></label><label>Mot de passe (au moins 12 caractères)<input id="signupPassword" type="password" minlength="12" autocomplete="new-password" required></label><button type="submit" class="primary">Créer mon compte et demander un accès</button><button type="button" id="cancelSignup">Retour à la connexion</button></form><p id="authError" role="alert"></p><p class="muted">Seuls les comptes autorisés dans Firestore peuvent accéder à la caisse.</p></div></div>
-<div class="app-layout" id="protectedApp" inert aria-hidden="true"><aside class="sidebar"><div class="sidebar-label">NAVIGATION</div><nav><button data-tab="dashboard" class="active">Tableau de bord</button><button data-tab="people">Collègues</button><button data-tab="monthly">Cotisations mensuelles</button><button data-tab="stock">Stocks</button><button data-tab="reports">Clôture & bilans</button><button data-tab="history">Historique</button><button data-tab="settings">Sauvegardes</button></nav><div class="sidebar-foot"><div class="flag"></div><strong>BTM AYDOILLES</strong><small>CAISSE CAFÉ • VERSION 6.1</small></div></aside><main class="content">
+<div class="app-layout" id="protectedApp" inert aria-hidden="true"><aside class="sidebar"><div class="sidebar-label">NAVIGATION</div><nav><button data-tab="dashboard" class="active">Tableau de bord</button><button data-tab="people">Collègues</button><button data-tab="monthly">Cotisations mensuelles</button><button data-tab="stock">Stocks</button><button data-tab="reports">Clôture & bilans</button><button data-tab="history">Historique</button><button data-tab="settings">Sauvegardes</button></nav><div class="sidebar-foot"><div class="flag"></div><strong>BTM AYDOILLES</strong><small>CAISSE CAFÉ</small></div></aside><main class="content">
 <section id="dashboard">
  <div class="dash-heading"><div><span class="eyebrow">VUE D’ENSEMBLE</span><h2>Tableau de bord</h2><p class="muted">Les comptes de la caisse, en un coup d’œil.</p></div></div>
  <div class="cards stat4">
@@ -313,7 +313,34 @@ $('signupForm').addEventListener('submit',async e=>{
  finally{signupInProgress=false;}
 });
 $('signOut').onclick=()=>signOut(auth);
-async function loadManagers(){const root=$('managerList');root.replaceChildren();if(role!=='admin')return;const snaps=await getDocs(collection(db,'managers'));snaps.forEach(s=>{const row=document.createElement('div'),label=document.createElement('span'),b=document.createElement('button');label.textContent=s.id+' · '+s.data().role+' · '+(s.data().active?'actif':'désactivé');b.textContent=s.data().active?'Désactiver':'Réactiver';b.disabled=s.id===user.uid;b.onclick=async()=>{if(!confirm('Modifier l’accès de ce compte ?'))return;try{await setDoc(doc(db,'managers',s.id),{role:s.data().role,active:!s.data().active});await loadManagers()}catch(e){alert(e.message)}};row.append(label,b);root.append(row)})}
+async function loadManagers(){
+ const root=$('managerList');root.replaceChildren();if(role!=='admin')return;
+ const [snaps,requests]=await Promise.all([getDocs(collection(db,'managers')),getDocs(collection(db,'accessRequests'))]);
+ const directory=new Map();requests.forEach(r=>directory.set(r.id,r.data()));
+ snaps.forEach(s=>{
+  const profile=s.data(),contact=directory.get(s.id)||{};
+  const row=document.createElement('div'),label=document.createElement('span'),buttons=document.createElement('div');
+  const name=document.createElement('strong');name.textContent=contact.name||'Compte sans nom enregistré';
+  const details=document.createElement('small');
+  details.textContent=' '+(contact.email||'E-mail non renseigné')+' · '+(profile.role==='admin'?'Administrateur':'Gestionnaire')+' · '+(profile.active?'Actif':'Désactivé');
+  details.title='UID : '+s.id;
+  label.append(name,document.createElement('br'),details);
+  const toggle=document.createElement('button');toggle.type='button';toggle.textContent=profile.active?'Désactiver':'Réactiver';toggle.disabled=s.id===user.uid;
+  toggle.onclick=async()=>{
+   if(!confirm((profile.active?'Désactiver':'Réactiver')+' le compte de '+(contact.name||contact.email||s.id)+' ?'))return;
+   try{await setDoc(doc(db,'managers',s.id),{role:profile.role,active:!profile.active},{merge:true});await loadManagers()}
+   catch(e){alert('Modification impossible : '+e.message)}
+  };
+  const remove=document.createElement('button');remove.type='button';remove.textContent='Retirer l’accès';remove.disabled=s.id===user.uid;
+  remove.title='Retire l’autorisation POPOTTE, sans supprimer le compte Firebase Authentication ni les écritures comptables.';
+  remove.onclick=async()=>{
+   if(!confirm('Retirer définitivement l’autorisation POPOTTE de '+(contact.name||contact.email||s.id)+' ?\\n\\nLe compte Firebase restera présent. Les écritures comptables seront conservées.'))return;
+   try{await deleteDoc(doc(db,'managers',s.id));await loadManagers()}
+   catch(e){alert('Retrait impossible : '+e.message)}
+  };
+  buttons.append(toggle,remove);row.append(label,buttons);root.append(row);
+ });
+}
 async function loadPendingRequests(){
  const root=$('pendingRequests');root.replaceChildren();if(role!=='admin')return;
  const title=document.createElement('h3');title.textContent='Demandes d’accès en attente';root.append(title);
@@ -336,5 +363,10 @@ async function loadPendingRequests(){
 }
 document.querySelector('[data-tab="settings"]').addEventListener('click',()=>{if(role==='admin')Promise.all([loadPendingRequests(),loadManagers()]).catch(err=>alert(err.message));});
 $('managerForm').addEventListener('submit',async e=>{e.preventDefault();const id=$('managerUid').value.trim(),r=$('managerRole').value;if(!/^[A-Za-z0-9]{10,128}$/.test(id)){alert('UID invalide');return}if(id===user.uid){alert('Ne modifie pas ton propre rôle ici');return}try{await setDoc(doc(db,'managers',id),{role:r,active:true});$('managerForm').reset();await loadManagers()}catch(err){alert('Autorisation impossible : '+err.message)}});
-onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=current;role=null;lock();if(!current){message('');return}message('Vérification des autorisations…');try{const profile=await getDoc(doc(db,'managers',current.uid));if(!profile.exists()||profile.data().active!==true||!['admin','manager'].includes(profile.data().role)){const request=await getDoc(doc(db,'accessRequests',current.uid));throw Error(request.exists()?'Demande d’accès en attente de validation par un administrateur.':'Compte non autorisé. Utilise « Créer un compte » pour demander un accès.');}role=profile.data().role;await refresh();$('managersPanel').hidden=role!=='admin';if(role==='admin')await Promise.all([loadManagers(),loadPendingRequests()]);unlock();message('');unsub=onSnapshot(stateRef,snap=>{if(!snap.exists()||writing)return;const d=snap.data();if(Number.isSafeInteger(d.revision)&&d.revision>revision){revision=d.revision;try{V.cloudLoad(d.payload,revision)}catch(e){alert(e.message)}}},err=>{lock();message('Synchronisation interrompue : '+err.message)})}catch(err){lock();message(err.message)}});
+onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=current;role=null;lock();if(!current){message('');return}message('Vérification des autorisations…');try{const profile=await getDoc(doc(db,'managers',current.uid));if(!profile.exists()||profile.data().active!==true||!['admin','manager'].includes(profile.data().role)){const request=await getDoc(doc(db,'accessRequests',current.uid));throw Error(request.exists()?(request.data().status==='pending'?'Demande d’accès en attente de validation par un administrateur.':'Accès retiré ou désactivé. Contacte un administrateur.'):'Compte non autorisé. Contacte un administrateur.');}role=profile.data().role;
+ const contactSnap=await getDoc(doc(db,'accessRequests',current.uid));
+ const contact=contactSnap.exists()?contactSnap.data():{};
+ $('connectedName').textContent=contact.name||current.email||'Compte connecté';
+ $('connectedRole').textContent=role==='admin'?'· Administrateur':'· Gestionnaire';
+ await refresh();$('managersPanel').hidden=role!=='admin';if(role==='admin')await Promise.all([loadManagers(),loadPendingRequests()]);unlock();message('');unsub=onSnapshot(stateRef,snap=>{if(!snap.exists()||writing)return;const d=snap.data();if(Number.isSafeInteger(d.revision)&&d.revision>revision){revision=d.revision;try{V.cloudLoad(d.payload,revision)}catch(e){alert(e.message)}}},err=>{lock();message('Synchronisation interrompue : '+err.message)})}catch(err){lock();message(err.message)}});
 </script></body></html>
