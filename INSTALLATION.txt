@@ -1,0 +1,17 @@
+POPOTTE V6.1 — INSCRIPTIONS ET VALIDATION DES GESTIONNAIRES
+
+1. SAUVEGARDER la caisse actuelle depuis la V6 (export JSON). Ne jamais publier cette sauvegarde dans le dépôt GitHub public.
+2. Dans Firebase > Firestore Database > Règles, remplacer les règles actuelles par le contenu COMPLET du fichier firestore.rules puis cliquer sur Publier. Les règles existantes sont conservées et une collection accessRequests est ajoutée.
+3. Dans GitHub Pages, remplacer UNIQUEMENT index.html par celui du ZIP. Les images ne changent pas.
+4. Attendre le déploiement, puis recharger (Ctrl+Maj+R). Les données Firestore ne sont pas réinitialisées.
+5. Depuis un autre téléphone ou un navigateur privé, cliquer sur Créer un compte / demander un accès. Utiliser un e-mail de test et un mot de passe fort. Le compte Firebase Authentication est créé, mais n'a aucun accès à la caisse.
+6. Depuis ton compte administrateur, ouvrir Sauvegardes > Gestionnaires autorisés > Demandes d'accès en attente. Choisir Gestionnaire ou Administrateur, puis Accepter.
+7. Le nouvel utilisateur se reconnecte ou recharge la page pour obtenir l'accès. Tester la synchronisation et les restrictions d'accès.
+
+SECURITE
+- L'inscription crée seulement une demande ; aucun accès aux données de caisse avant validation.
+- L'administrateur approuve depuis l'application. Les règles Firestore empêchent l'auto-attribution du rôle admin.
+- Les demandes refusées restent enregistrées ; cette version ne permet pas de déposer une deuxième demande depuis le même compte.
+- La désactivation d'un gestionnaire retire l'accès Firestore à ses prochaines requêtes. Le compte Authentication reste créé.
+- Les e-mails des demandes sont accessibles aux administrateurs ; ne pas saisir de données réelles de collègues avant validation de l'hébergement.
+- Cette version n'a pas été testée contre un projet Firebase réel ; tester avec des données fictives et deux comptes avant utilisation.
