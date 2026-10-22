@@ -82,8 +82,8 @@ button.primary,.primary{background:#1265c2;color:white}button:hover{filter:brigh
   </div>
 </header>
 <div id="cloudBar" hidden><span><strong id="connectedName">Compte connecté</strong> <small id="connectedRole"></small> · <span id="cloudStatus">Connexion…</span></span><button id="signOut" type="button">Déconnexion</button></div>
-<div id="authScreen"><div id="authCard"><h2>☕ Caisse Café BTM Aydoilles</h2><p>Connexion et demandes d’accès à la caisse</p><form id="authForm"><label>Adresse e-mail<input id="authEmail" type="email" required autocomplete="username"></label><label>Mot de passe<input id="authPassword" type="password" required autocomplete="current-password"></label><button class="primary" type="submit">Se connecter</button></form><p><button id="showSignup" type="button">Créer un compte / demander un accès</button></p>
-<form id="signupForm" hidden><label>Nom ou prénom d’affichage<input id="signupName" type="text" minlength="2" maxlength="80" autocomplete="name" required></label><label>Adresse e-mail<input id="signupEmail" type="email" autocomplete="email" required></label><label>Mot de passe (au moins 12 caractères)<input id="signupPassword" type="password" minlength="12" autocomplete="new-password" required></label><button type="submit" class="primary">Créer mon compte et demander un accès</button><button type="button" id="cancelSignup">Retour à la connexion</button></form><p id="authError" role="alert"></p><p class="muted">Seuls les comptes autorisés dans Firestore peuvent accéder à la caisse.</p></div></div>
+<div id="authScreen"><div id="authCard"><h2>☕ Caisse Café BTM Aydoilles</h2><p>Connexion et demandes d’accès à la caisse</p><form id="authForm"><label>Pseudo (ou e-mail pour les anciens administrateurs)<input id="authEmail" type="text" required autocomplete="username" autocapitalize="none" spellcheck="false"></label><label>Mot de passe<input id="authPassword" type="password" required autocomplete="current-password"></label><button class="primary" type="submit">Se connecter</button></form><p><button id="showSignup" type="button">Créer un compte / demander un accès</button></p>
+<form id="signupForm" hidden><label>Pseudo utilisé dans la caisse<input id="signupName" type="text" minlength="3" maxlength="24" pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,23}" autocapitalize="none" spellcheck="false" autocomplete="username" required></label><label>Mot de passe (au moins 12 caractères)<input id="signupPassword" type="password" minlength="12" autocomplete="new-password" required></label><button type="submit" class="primary">Créer mon compte et demander un accès</button><button type="button" id="cancelSignup">Retour à la connexion</button></form><p id="authError" role="alert"></p><p class="muted">Seuls les comptes autorisés dans Firestore peuvent accéder à la caisse.</p></div></div>
 <div class="app-layout" id="protectedApp" inert aria-hidden="true"><aside class="sidebar"><div class="sidebar-label">NAVIGATION</div><nav><button data-tab="dashboard" class="active">Tableau de bord</button><button data-tab="people">Collègues</button><button data-tab="monthly">Cotisations mensuelles</button><button data-tab="stock">Stocks</button><button data-tab="reports">Clôture & bilans</button><button data-tab="history">Historique</button><button data-tab="settings">Sauvegardes</button></nav><div class="sidebar-foot"><div class="flag"></div><strong>BTM AYDOILLES</strong><small>CAISSE CAFÉ</small></div></aside><main class="content">
 <section id="dashboard">
  <div class="dash-heading"><div><span class="eyebrow">VUE D’ENSEMBLE</span><h2>Tableau de bord</h2><p class="muted">Les comptes de la caisse, en un coup d’œil.</p></div></div>
@@ -278,7 +278,7 @@ function save(){
  render();
 }
 // Ne jamais utiliser les données locales comme source de vérité lors d'une connexion V6.
-window.popotteV6={emptyV6,validV6,cloudLoad,cloudSetBusy,setReady:v=>{cloudReady=v;cloudSetBusy(false)},getRevision:()=>cloudRevision};
+window.popotteV6={getPeople:()=>data.people.map(p=>({id:p.id,name:p.name})),emptyV6,validV6,cloudLoad,cloudSetBusy,setReady:v=>{cloudReady=v;cloudSetBusy(false)},getRevision:()=>cloudRevision};
 render();
 </script><script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
@@ -289,6 +289,14 @@ const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),V=window.pop
 const $=id=>document.getElementById(id),stateRef=doc(db,'caisse','principale');
 let user=null,unsub=null,revision=0,writing=false,role=null;
 let signupInProgress=false;
+// Identifiants techniques : aucune adresse e-mail personnelle n'est demandée.
+// Domaine réservé .invalid : ces adresses ne peuvent pas recevoir d'e-mails.
+// Les comptes historiques continuent de se connecter avec leur adresse e-mail.
+function normalizePseudo(raw){return raw.trim().toLowerCase()}
+function validPseudo(value){return /^[a-z0-9][a-z0-9._-]{2,23}$/.test(value)}
+function pseudoEmail(pseudo){return pseudo+'@users.popotte.invalid'}
+function loginIdentifier(raw){const value=raw.trim();if(value.includes('@'))return value;const pseudo=normalizePseudo(value);if(!validPseudo(pseudo))throw Error('Pseudo invalide : 3 à 24 caractères, lettres, chiffres, point, tiret ou souligné.');return pseudoEmail(pseudo)}
+
 function message(s){$('authError').textContent=s}
 function lock(){V.setReady(false);$('protectedApp').setAttribute('aria-hidden','true');$('cloudBar').hidden=true;$('authScreen').hidden=false}
 function unlock(){V.setReady(true);$('protectedApp').removeAttribute('aria-hidden');$('cloudBar').hidden=false;$('authScreen').hidden=true}
@@ -296,20 +304,20 @@ async function refresh(){const snap=await getDoc(stateRef);if(!snap.exists()){if
  const val=snap.data();if(!Number.isSafeInteger(val.revision)||!V.validV6(val.payload))throw Error('Structure de caisse invalide.');revision=val.revision;V.cloudLoad(val.payload,revision)}
 window.popotteCloud={refresh,async commit(payload,expected){if(!user)throw Error('Non connecté');if(!V.validV6(payload))throw Error('Données invalides');if(JSON.stringify(payload).length>700000)throw Error('Limite de taille proche : exporte le JSON et contacte un administrateur');writing=true;
  try{const next=await runTransaction(db,async tx=>{const snap=await tx.get(stateRef);if(!snap.exists()||snap.data().revision!==expected)throw Error('Un autre gestionnaire a modifié la caisse. Recharge les données et recommence.');const next=expected+1;tx.update(stateRef,{revision:next,payload,updatedAt:serverTimestamp(),updatedBy:user.uid});tx.set(doc(collection(db,'audit')),{actor:user.uid,at:serverTimestamp(),revision:next,kind:'modification',summary:{people:payload.people.length,operations:payload.operations.length,packs:payload.packs.length}});return next});revision=next;return next}finally{writing=false}}};
-$('authForm').addEventListener('submit',async e=>{e.preventDefault();message('Connexion en cours…');try{await signInWithEmailAndPassword(auth,$('authEmail').value.trim(),$('authPassword').value)}catch(err){message('Connexion impossible : '+err.message)}});
+$('authForm').addEventListener('submit',async e=>{e.preventDefault();message('Connexion en cours…');try{await signInWithEmailAndPassword(auth,loginIdentifier($('authEmail').value),$('authPassword').value)}catch(err){message('Connexion impossible : '+err.message)}});
 $('showSignup').onclick=()=>{$('signupForm').hidden=false;$('authForm').hidden=true;$('showSignup').hidden=true;message('');};
 $('cancelSignup').onclick=()=>{$('signupForm').hidden=true;$('authForm').hidden=false;$('showSignup').hidden=false;message('');};
 $('signupForm').addEventListener('submit',async e=>{
  e.preventDefault();if(signupInProgress)return;
- const name=$('signupName').value.trim(),email=$('signupEmail').value.trim(),password=$('signupPassword').value;
- if(name.length<2||name.length>80||password.length<12){message('Nom ou mot de passe invalide.');return;}
+ const name=normalizePseudo($('signupName').value),email=pseudoEmail(name),password=$('signupPassword').value;
+ if(!validPseudo(name)||password.length<12){message('Pseudo invalide (3 à 24 caractères : lettres, chiffres, point, tiret, souligné) ou mot de passe trop court (12 caractères minimum).');return;}
  signupInProgress=true;message('Création du compte et envoi de la demande…');
  try{
    const cred=await createUserWithEmailAndPassword(auth,email,password);
    await setDoc(doc(db,'accessRequests',cred.user.uid),{name,email,createdAt:serverTimestamp(),status:'pending'});
    message('Demande envoyée. Un administrateur doit la valider. Reviens plus tard et reconnecte-toi.');
    $('signupForm').hidden=true;$('authForm').hidden=false;$('showSignup').hidden=false;
- }catch(err){message('Demande non enregistrée : '+err.message+' Si le compte existe déjà, reconnecte-toi et réessaie.');}
+ }catch(err){message(err.code==='auth/email-already-in-use'?'Ce pseudo est déjà utilisé. Choisis un autre pseudo ou reconnecte-toi.':'Demande non enregistrée : '+err.message);}
  finally{signupInProgress=false;}
 });
 $('signOut').onclick=()=>signOut(auth);
@@ -322,13 +330,13 @@ async function loadManagers(){
   const row=document.createElement('div'),label=document.createElement('span'),buttons=document.createElement('div');
   const name=document.createElement('strong');name.textContent=contact.name||'Compte sans nom enregistré';
   const details=document.createElement('small');
-  details.textContent=' '+(contact.email||'E-mail non renseigné')+' · '+(profile.role==='admin'?'Administrateur':'Gestionnaire')+' · '+(profile.active?'Actif':'Désactivé');
+  details.textContent=' '+(contact.email?.endsWith('@users.popotte.invalid')?'Pseudo sans e-mail personnel':(contact.email||'Ancien compte'))+' · '+(profile.role==='admin'?'Administrateur':'Utilisateur (accès complet provisoire)')+' · '+(profile.active?'Actif':'Désactivé');
   details.title='UID : '+s.id;
   label.append(name,document.createElement('br'),details);
   const toggle=document.createElement('button');toggle.type='button';toggle.textContent=profile.active?'Désactiver':'Réactiver';toggle.disabled=s.id===user.uid;
   toggle.onclick=async()=>{
    if(!confirm((profile.active?'Désactiver':'Réactiver')+' le compte de '+(contact.name||contact.email||s.id)+' ?'))return;
-   try{await setDoc(doc(db,'managers',s.id),{role:profile.role,active:!profile.active},{merge:true});await loadManagers()}
+   try{await setDoc(doc(db,'managers',s.id),{active:!profile.active},{merge:true});await loadManagers()}
    catch(e){alert('Modification impossible : '+e.message)}
   };
   const remove=document.createElement('button');remove.type='button';remove.textContent='Retirer l’accès';remove.disabled=s.id===user.uid;
@@ -347,18 +355,24 @@ async function loadPendingRequests(){
  const snaps=await getDocs(collection(db,'accessRequests'));let count=0;
  snaps.forEach(s=>{const d=s.data();if(d.status!=='pending')return;count++;
  const row=document.createElement('div');row.className='request-row';
- const info=document.createElement('div');const strong=document.createElement('strong');strong.textContent=d.name||'Sans nom';const details=document.createElement('div');details.textContent=(d.email||'')+' · '+s.id;info.append(strong,details);
- const select=document.createElement('select');[['manager','Gestionnaire'],['admin','Administrateur']].forEach(([v,l])=>{const opt=document.createElement('option');opt.value=v;opt.textContent=l;select.append(opt)});
+ const info=document.createElement('div');const strong=document.createElement('strong');strong.textContent=d.name||'Sans nom';const details=document.createElement('div');details.textContent=(d.email?.endsWith('@users.popotte.invalid')?'Inscription sans e-mail personnel':(d.email||'Ancien compte'))+' · '+s.id;info.append(strong,details);
+ const select=document.createElement('select');[['manager','Utilisateur (préparation)'],['admin','Administrateur']].forEach(([v,l])=>{const opt=document.createElement('option');opt.value=v;opt.textContent=l;select.append(opt)});
+ const personSelect=document.createElement('select');personSelect.title='Fiche collègue associée au compte';
+ const noPerson=document.createElement('option');noPerson.value='';noPerson.textContent='Associer une fiche collègue';personSelect.append(noPerson);
+ (V.getPeople?.()||[]).forEach(p=>{const option=document.createElement('option');option.value=p.id;option.textContent=p.name;personSelect.append(option)});
+ personSelect.hidden=false;
  const accept=document.createElement('button');accept.type='button';accept.textContent='Accepter';accept.className='primary';
  const reject=document.createElement('button');reject.type='button';reject.textContent='Refuser';
- accept.onclick=async()=>{if(!confirm('Autoriser '+(d.email||s.id)+' comme '+select.value+' ?'))return;
+ select.onchange=()=>{personSelect.hidden=select.value==='admin'};
+ accept.onclick=async()=>{if(select.value!=='admin'&&!personSelect.value){alert('Choisis la fiche collègue à associer.');return}
+ if(!confirm('Autoriser '+(d.name||s.id)+' comme '+(select.value==='admin'?'administrateur':'utilisateur')+' ?'))return;
  accept.disabled=true;reject.disabled=true;
- try{const batch=writeBatch(db);batch.set(doc(db,'managers',s.id),{role:select.value,active:true});batch.update(doc(db,'accessRequests',s.id),{status:'approved',reviewedAt:serverTimestamp(),reviewedBy:user.uid});await batch.commit();await Promise.all([loadPendingRequests(),loadManagers()]);}
+ try{const batch=writeBatch(db);batch.set(doc(db,'managers',s.id),{role:select.value,active:true,...(select.value==='manager'?{personId:personSelect.value}:{})});batch.update(doc(db,'accessRequests',s.id),{status:'approved',reviewedAt:serverTimestamp(),reviewedBy:user.uid});await batch.commit();await Promise.all([loadPendingRequests(),loadManagers()]);}
  catch(err){alert('Validation refusée : '+err.message);accept.disabled=false;reject.disabled=false;}};
  reject.onclick=async()=>{if(!confirm('Refuser cette demande ?'))return;reject.disabled=true;
  try{await setDoc(doc(db,'accessRequests',s.id),{status:'rejected',reviewedAt:serverTimestamp(),reviewedBy:user.uid},{merge:true});await loadPendingRequests();}
  catch(err){alert('Refus impossible : '+err.message);reject.disabled=false;}};
- row.append(info,select,accept,reject);root.append(row);
+ row.append(info,select,personSelect,accept,reject);root.append(row);
  });if(!count){const p=document.createElement('p');p.textContent='Aucune demande en attente.';root.append(p);}
 }
 document.querySelector('[data-tab="settings"]').addEventListener('click',()=>{if(role==='admin')Promise.all([loadPendingRequests(),loadManagers()]).catch(err=>alert(err.message));});
@@ -367,6 +381,6 @@ onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=curren
  const contactSnap=await getDoc(doc(db,'accessRequests',current.uid));
  const contact=contactSnap.exists()?contactSnap.data():{};
  $('connectedName').textContent=contact.name||current.email||'Compte connecté';
- $('connectedRole').textContent=role==='admin'?'· Administrateur':'· Gestionnaire';
+ $('connectedRole').textContent=role==='admin'?'· Administrateur':'· Utilisateur (droits provisoires)';
  await refresh();$('managersPanel').hidden=role!=='admin';if(role==='admin')await Promise.all([loadManagers(),loadPendingRequests()]);unlock();message('');unsub=onSnapshot(stateRef,snap=>{if(!snap.exists()||writing)return;const d=snap.data();if(Number.isSafeInteger(d.revision)&&d.revision>revision){revision=d.revision;try{V.cloudLoad(d.payload,revision)}catch(e){alert(e.message)}}},err=>{lock();message('Synchronisation interrompue : '+err.message)})}catch(err){lock();message(err.message)}});
 </script></body></html>
