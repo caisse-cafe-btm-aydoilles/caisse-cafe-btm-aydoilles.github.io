@@ -70,7 +70,8 @@ button.primary,.primary{background:#1265c2;color:white}button:hover{filter:brigh
 #cloudBar button{padding:5px 12px}#managerList>div{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #dce4ed;flex-wrap:wrap}
 #managerForm{display:flex;flex-wrap:wrap;gap:12px;align-items:end}#managerForm label{flex:1;min-width:150px}
 #signupForm[hidden],#authForm[hidden]{display:none!important}#signupForm{padding:10px 0;border-top:1px solid #dce4ed}#pendingRequests{margin:14px 0}.request-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #dce4ed;padding:12px 0}.request-row>div{flex:1;min-width:170px;overflow-wrap:anywhere}.request-row select{width:auto;min-width:140px}.request-row button{white-space:nowrap}
-#protectedApp[aria-hidden="true"]{display:none!important}#personalApp[hidden]{display:none!important}#personalApp{max-width:720px;margin:20px auto 55px;padding:0 16px}.personal-wrap{display:grid;gap:18px}.personal-header{padding:20px 5px}.personal-header span{font-size:12px;letter-spacing:1.5px;color:#45617d}.personal-header h2{margin:8px 0 3px;font-size:26px}.personal-balance{border-radius:18px;background:#123d68;color:white;padding:30px;display:grid;gap:8px;text-align:center}.personal-balance strong{font-size:42px}.personal-balance small{opacity:.85}.personal-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}.personal-cards>div,.personal-action{background:white;border:1px solid #d9e3ed;border-radius:14px;padding:20px;display:grid;gap:8px}.personal-cards span{color:#546b82;font-size:13px}.personal-cards strong{font-size:23px}.personal-action button{min-height:52px;font-size:17px}.personal-action p{margin:0;color:#52677d}@media(max-width:480px){.personal-cards{grid-template-columns:1fr}#personalApp{padding:0 10px}}\n</style></head><body>
+#personalApp{max-width:720px;margin:20px auto 55px;padding:0 16px}.personal-wrap{display:grid;gap:18px}.personal-header{padding:20px 5px}.personal-header span{font-size:12px;letter-spacing:1.5px;color:#45617d}.personal-header h2{margin:8px 0 3px;font-size:26px}.personal-balance{border-radius:18px;background:#123d68;color:white;padding:30px;display:grid;gap:8px;text-align:center}.personal-balance strong{font-size:42px}.personal-balance small{opacity:.85}.personal-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}.personal-cards>div,.personal-action{background:white;border:1px solid #d9e3ed;border-radius:14px;padding:20px;display:grid;gap:8px}.personal-cards span{color:#546b82;font-size:13px}.personal-cards strong{font-size:23px}.personal-action button{min-height:52px;font-size:17px}.personal-action p{margin:0;color:#52677d}@media(max-width:480px){.personal-cards{grid-template-columns:1fr}#personalApp{padding:0 10px}}\n.personal-quantity{display:flex;align-items:center;justify-content:center;gap:22px}.personal-quantity button{min-width:48px;min-height:48px}.personal-quantity strong{font-size:25px;min-width:25px;text-align:center}
+</style></head><body>
 <header class="hero hero-v52" role="banner">
   <div class="hero-identity">
     <div class="logo-frame"><img src="logo-gendarmerie.png" alt="Logo Gendarmerie nationale fourni par l’unité"></div>
@@ -145,8 +146,7 @@ button.primary,.primary{background:#1265c2;color:white}button:hover{filter:brigh
 <script>
 'use strict';
 const KEY='popotte_v1';const $=id=>document.getElementById(id);const money=n=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(n/100);const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random();const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
-let data={people:[],operations:[],drinks:{},coffeeExempt:{},products:[],packs:[],adjustments:[],closures:[],cashChecks:[]};// Ne pas conserver une copie de la caisse dans le navigateur partagé.
-try{localStorage.removeItem(KEY)}catch(e){console.warn(e)}
+let data={people:[],operations:[],drinks:{},coffeeExempt:{},products:[],packs:[],adjustments:[],closures:[],cashChecks:[]};try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.people)&&Array.isArray(saved.operations))data={...data,...saved,drinks:saved.drinks&&typeof saved.drinks==='object'&&!Array.isArray(saved.drinks)?saved.drinks:{},coffeeExempt:saved.coffeeExempt||{},products:Array.isArray(saved.products)?saved.products:[],packs:Array.isArray(saved.packs)?saved.packs:[],adjustments:Array.isArray(saved.adjustments)?saved.adjustments:[],closures:Array.isArray(saved.closures)?saved.closures:[],cashChecks:Array.isArray(saved.cashChecks)?saved.cashChecks:[]}}catch(e){console.warn(e)}
 function save(){localStorage.setItem(KEY,JSON.stringify(data));render()};function toast(s){$('message').textContent=s;$('message').classList.add('show');setTimeout(()=>$('message').classList.remove('show'),3200)}function nameFor(id){return data.people.find(p=>p.id===id)?.name||''}function sorted(){return [...data.operations].sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created)}
 function render(){renderMonthly();renderStock();renderReports();renderProfit();const income=data.operations.filter(o=>o.type==='income').reduce((s,o)=>s+o.cents,0),expense=data.operations.filter(o=>o.type==='expense').reduce((s,o)=>s+o.cents,0);$('balance').textContent=money(income-expense);$('income').textContent=money(income);$('expenses').textContent=money(expense);$('recent').innerHTML='';const r=sorted().slice(0,6);if(!r.length)$('recent').append(empty('Aucune opération enregistrée.'));else r.forEach(o=>$('recent').append(opLine(o)));
 $('peopleRows').innerHTML='';if(!data.people.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=4;td.textContent='Aucun collègue ajouté.';tr.append(td);$('peopleRows').append(tr)}else [...data.people].sort((a,b)=>a.name.localeCompare(b.name,'fr')).forEach(p=>{const ops=data.operations.filter(o=>o.type==='income'&&o.personId===p.id),tr=document.createElement('tr');[p.name,String(ops.length),money(ops.reduce((s,o)=>s+o.cents,0))].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});const td=document.createElement('td'),b=document.createElement('button');b.className='ghost';b.textContent='Renommer';b.onclick=()=>{const n=prompt('Nouveau nom',p.name);if(n&&n.trim()){p.name=n.trim();save()}};td.append(b);tr.append(td);$('peopleRows').append(tr)});
@@ -278,16 +278,16 @@ const emptyV6=()=>({people:[],operations:[],drinks:{},coffeeExempt:{},products:[
 const validV6=x=>x&&Array.isArray(x.people)&&Array.isArray(x.operations)&&Array.isArray(x.products)&&Array.isArray(x.packs)&&Array.isArray(x.adjustments)&&Array.isArray(x.closures)&&Array.isArray(x.cashChecks)&&x.drinks&&typeof x.drinks==='object'&&x.coffeeExempt&&typeof x.coffeeExempt==='object';
 function showCloudStatus(t){$('cloudStatus').textContent=t}
 function cloudSetBusy(v){cloudBusy=v;document.querySelector('#protectedApp').inert=v||!cloudReady;showCloudStatus(v?'Enregistrement en cours…':cloudReady?'Synchronisé · révision '+cloudRevision:'Connexion…')}
-function cloudLoad(remote,revision){if(!validV6(remote)){throw Error('Données distantes invalides : aucun remplacement effectué.')}data=JSON.parse(JSON.stringify(remote));cloudRevision=revision;render();cloudSetBusy(false)}
+function cloudLoad(remote,revision){if(!validV6(remote)){throw Error('Données distantes invalides : aucun remplacement effectué.')}data=JSON.parse(JSON.stringify(remote));cloudRevision=revision;localStorage.setItem(KEY,JSON.stringify(data));render();cloudSetBusy(false)}
 function save(){
  if(!cloudReady||cloudBusy){alert('Connexion indisponible ou opération déjà en cours. Aucune modification enregistrée.');return}
  const proposed=JSON.parse(JSON.stringify(data)),expected=cloudRevision;
  cloudSetBusy(true);
- window.popotteCloud.commit(proposed,expected).then(revision=>{cloudRevision=revision;toast('Enregistré dans la caisse partagée');cloudSetBusy(false);window.popotteCloud.publish?.().catch(e=>console.warn('Fiches personnelles non actualisées :',e))}).catch(async err=>{alert('Enregistrement refusé : '+err.message+'\nLes données partagées vont être rechargées.');try{await window.popotteCloud.refresh()}catch(e){cloudReady=false;cloudSetBusy(false);$('authScreen').hidden=false;$('authError').textContent='Connexion interrompue : '+e.message}});
+ window.popotteCloud.commit(proposed,expected).then(revision=>{cloudRevision=revision;localStorage.setItem(KEY,JSON.stringify(proposed));toast('Enregistré dans la caisse partagée');cloudSetBusy(false)}).catch(async err=>{alert('Enregistrement refusé : '+err.message+'\nLes données partagées vont être rechargées.');try{await window.popotteCloud.refresh()}catch(e){cloudReady=false;cloudSetBusy(false);$('authScreen').hidden=false;$('authError').textContent='Connexion interrompue : '+e.message}});
  render();
 }
 // Ne jamais utiliser les données locales comme source de vérité lors d'une connexion V6.
-window.popotteV6={getPeople:()=>data.people.map(p=>({id:p.id,name:p.name})),wipeLocal:()=>{localStorage.removeItem(KEY);data=emptyV6();render()},
+window.popotteV6={getPeople:()=>data.people.map(p=>({id:p.id,name:p.name})),
 canRecordDrink:(month,personId)=>!isLocked(month)&&!!monthlySummary(month).find(x=>x.person.id===personId&&x.active),
 addPersonalDrink:async(month,personId,quantity)=>{
  if(!Number.isSafeInteger(quantity)||quantity!==1||isLocked(month))throw Error('Consommation invalide ou mois clôturé.');
@@ -309,11 +309,11 @@ render();
 </script><script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import {getFirestore,doc,getDoc,collection,getDocs,setDoc,deleteDoc,onSnapshot,runTransaction,serverTimestamp,writeBatch} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+import {getFirestore,doc,getDoc,collection,getDocs,setDoc,deleteDoc,onSnapshot,runTransaction,serverTimestamp,writeBatch,query,where,orderBy} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 const cfg={apiKey:'AIzaSyDSJlX8ITzfeNFu7rfM-cQdCo9vU5JZlOo',authDomain:'caisse-cafe-btm-aydoilles.firebaseapp.com',projectId:'caisse-cafe-btm-aydoilles',storageBucket:'caisse-cafe-btm-aydoilles.firebasestorage.app',messagingSenderId:'445240251486',appId:'1:445240251486:web:433dc5cb85d3943c27d0cf'};
 const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),V=window.popotteV6;
 const $=id=>document.getElementById(id),stateRef=doc(db,'caisse','principale');
-let user=null,unsub=null,personalUnsub=null,revision=0,writing=false,role=null;
+let user=null,unsub=null,personalUnsub=null,drinkUnsub=null,adminDrinkUnsub=null,revision=0,writing=false,role=null;
 let signupInProgress=false;
 // Identifiants techniques : aucune adresse e-mail personnelle n'est demandée.
 // Domaine réservé .invalid : ces adresses ne peuvent pas recevoir d'e-mails.
@@ -324,7 +324,7 @@ function pseudoEmail(pseudo){return pseudo+'@users.popotte.invalid'}
 function loginIdentifier(raw){const value=raw.trim();if(value.includes('@'))return value;const pseudo=normalizePseudo(value);if(!validPseudo(pseudo))throw Error('Pseudo invalide : 3 à 24 caractères, lettres, chiffres, point, tiret ou souligné.');return pseudoEmail(pseudo)}
 
 function message(s){$('authError').textContent=s}
-function lock(){if(personalUnsub){personalUnsub();personalUnsub=null}$('personalApp').hidden=true;V.setReady(false);$('protectedApp').setAttribute('aria-hidden','true');$('cloudBar').hidden=true;$('authScreen').hidden=false}
+function lock(){if(drinkUnsub){drinkUnsub();drinkUnsub=null}if(adminDrinkUnsub){adminDrinkUnsub();adminDrinkUnsub=null}if(personalUnsub){personalUnsub();personalUnsub=null}$('personalApp').hidden=true;V.setReady(false);$('protectedApp').setAttribute('aria-hidden','true');$('cloudBar').hidden=true;$('authScreen').hidden=false}
 function unlock(){V.setReady(true);$('protectedApp').removeAttribute('aria-hidden');$('cloudBar').hidden=false;$('authScreen').hidden=true}
 function unlockPersonal(){
  $('protectedApp').setAttribute('aria-hidden','true');$('protectedApp').inert=true;
@@ -353,30 +353,51 @@ async function publishPersonalSnapshots(){
 function openPersonal(personId){
  unlockPersonal();
  const viewRef=doc(db,'personalViews',user.uid);
- $('personalAdd').onclick=async()=>{
-  const btn=$('personalAdd');btn.disabled=true;$('personalResult').textContent='Envoi de la demande…';
-  try{
-   await setDoc(doc(collection(db,'consumptionRequests')),{uid:user.uid,personId,month:new Date().toISOString().slice(0,7),quantity:1,status:'pending',createdAt:serverTimestamp()});
-   $('personalResult').textContent='Demande envoyée. Elle sera comptabilisée après validation par un administrateur.';
-  }catch(e){$('personalResult').textContent='Échec : '+e.message}
-  finally{btn.disabled=false}
- };
- personalUnsub=onSnapshot(viewRef,snap=>{
-  if(!snap.exists()){$('personalResult').textContent='Ta fiche est en attente de synchronisation par un administrateur.';return}
-  const d=snap.data();
-  if(d.personId!==personId){$('personalResult').textContent='Association incohérente : contacte un administrateur.';$('personalAdd').disabled=true;return}
+ let quantity=1,personalData=null,ownEvents=[];
+ const btn=$('personalAdd'),minus=$('personalMinus'),plus=$('personalPlus');
+ function updateQty(){ $('personalQty').textContent=quantity;btn.textContent='Enregistrer '+quantity+' canette'+(quantity>1?'s':'');minus.disabled=quantity<=1;plus.disabled=quantity>=10 }
+ function updatePersonal(){
+  if(!personalData)return;
+  const d=personalData,baseDate=d.updatedAt?.toMillis?.()||0;
+  const pending=ownEvents.filter(e=>(!e.appliedAt||e.appliedAt.toMillis()>baseDate)&&e.createdAt?.toDate?.().toLocaleDateString('sv-SE',{timeZone:'Europe/Paris'}).slice(0,7)===d.month);
+  const qty=pending.reduce((sum,e)=>sum+e.quantity,0);
+  const balance=d.balance+qty*70;
   $('personalHello').textContent='Bonjour, '+d.name;
-  $('personalBalance').textContent=(Math.abs(d.balance)/100).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
-  $('personalBalanceLabel').textContent=d.balance>0?'Montant à régler':d.balance<0?'Crédit en ta faveur':'Tu es à jour';
+  $('personalBalance').textContent=(Math.abs(balance)/100).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
+  $('personalBalanceLabel').textContent=balance>0?'Montant à régler':balance<0?'Crédit en ta faveur':'Tu es à jour';
   $('personalCoffee').textContent=(d.coffee/100).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
-  $('personalDrinks').textContent=String(d.drinks);
-  $('personalUpdated').textContent='Situation du mois '+d.month+' · synchronisée lors de la dernière mise à jour administrateur';
- },e=>{$('personalResult').textContent='Accès à la fiche interrompu : '+e.message;$('personalAdd').disabled=true});
+  $('personalDrinks').textContent=String(d.drinks+qty);
+  $('personalUpdated').textContent=qty?'Dont '+qty+' canette(s) en attente d’intégration comptable · caisse synchronisée lors du passage administrateur':'Situation du mois '+d.month+' · dernière publication administrateur';
+ }
+ minus.onclick=()=>{quantity=Math.max(1,quantity-1);updateQty()};
+ plus.onclick=()=>{quantity=Math.min(10,quantity+1);updateQty()};
+ updateQty();
+ btn.onclick=async()=>{
+  if(!confirm('Enregistrer '+quantity+' canette'+(quantity>1?'s':'')+' ?'))return;
+  btn.disabled=true;minus.disabled=true;plus.disabled=true;
+  $('personalResult').textContent='Enregistrement…';
+  try{
+   await setDoc(doc(collection(db,'drinkEvents')),{uid:user.uid,personId,quantity,createdAt:serverTimestamp()});
+   $('personalResult').textContent='Consommation enregistrée. La caisse sera consolidée automatiquement à la prochaine connexion administrateur.';
+   quantity=1;
+  }catch(e){$('personalResult').textContent='Enregistrement refusé : '+e.message}
+  finally{btn.disabled=false;updateQty()}
+ };
+ drinkUnsub=onSnapshot(query(collection(db,'drinkEvents'),where('uid','==',user.uid)),snap=>{
+  ownEvents=snap.docs.map(x=>x.data());updatePersonal();
+ },e=>{$('personalResult').textContent='Lecture des consommations impossible : '+e.message});
+ personalUnsub=onSnapshot(viewRef,snap=>{
+  if(!snap.exists()){$('personalResult').textContent='Fiche personnelle en attente de publication par un administrateur.';btn.disabled=true;return}
+  const d=snap.data();
+  if(d.personId!==personId){$('personalResult').textContent='Association incohérente : contacte un administrateur.';btn.disabled=true;return}
+  personalData=d;updatePersonal();
+ },e=>{$('personalResult').textContent='Accès à la fiche interrompu : '+e.message;btn.disabled=true});
+
 }
 async function refresh(){const snap=await getDoc(stateRef);if(!snap.exists()){if(role!=='admin')throw Error('Caisse non initialisée : contacte un administrateur.');await runTransaction(db,async tx=>{const current=await tx.get(stateRef);if(!current.exists())tx.set(stateRef,{revision:0,payload:V.emptyV6(),updatedAt:serverTimestamp(),updatedBy:user.uid})});return refresh()}
  const val=snap.data();if(!Number.isSafeInteger(val.revision)||!V.validV6(val.payload))throw Error('Structure de caisse invalide.');revision=val.revision;V.cloudLoad(val.payload,revision);if(role==='admin')await publishPersonalSnapshots()}
-window.popotteCloud={refresh,publish:publishPersonalSnapshots,async commit(payload,expected){if(!user)throw Error('Non connecté');if(!V.validV6(payload))throw Error('Données invalides');if(JSON.stringify(payload).length>700000)throw Error('Limite de taille proche : exporte le JSON et contacte un administrateur');writing=true;
- try{const next=await runTransaction(db,async tx=>{const snap=await tx.get(stateRef);if(!snap.exists()||snap.data().revision!==expected)throw Error('Un autre gestionnaire a modifié la caisse. Recharge les données et recommence.');const next=expected+1;tx.update(stateRef,{revision:next,payload,updatedAt:serverTimestamp(),updatedBy:user.uid});tx.set(doc(collection(db,'audit')),{actor:user.uid,at:serverTimestamp(),revision:next,kind:'modification',summary:{people:payload.people.length,operations:payload.operations.length,packs:payload.packs.length}});return next});revision=next;return next}finally{writing=false}}};
+window.popotteCloud={refresh,async commit(payload,expected){if(!user)throw Error('Non connecté');if(!V.validV6(payload))throw Error('Données invalides');if(JSON.stringify(payload).length>700000)throw Error('Limite de taille proche : exporte le JSON et contacte un administrateur');writing=true;
+ try{const next=await runTransaction(db,async tx=>{const snap=await tx.get(stateRef);if(!snap.exists()||snap.data().revision!==expected)throw Error('Un autre gestionnaire a modifié la caisse. Recharge les données et recommence.');const next=expected+1;tx.update(stateRef,{revision:next,payload,updatedAt:serverTimestamp(),updatedBy:user.uid});tx.set(doc(collection(db,'audit')),{actor:user.uid,at:serverTimestamp(),revision:next,kind:'modification',summary:{people:payload.people.length,operations:payload.operations.length,packs:payload.packs.length}});return next});revision=next;if(role==='admin')await publishPersonalSnapshots();queueMicrotask(()=>reconcileDrinkEvents().catch(console.warn));return next}finally{writing=false}}};
 $('authForm').addEventListener('submit',async e=>{e.preventDefault();message('Connexion en cours…');try{await signInWithEmailAndPassword(auth,loginIdentifier($('authEmail').value),$('authPassword').value)}catch(err){message('Connexion impossible : '+err.message)}});
 $('showSignup').onclick=()=>{$('signupForm').hidden=false;$('authForm').hidden=true;$('showSignup').hidden=true;message('');};
 $('cancelSignup').onclick=()=>{$('signupForm').hidden=true;$('authForm').hidden=false;$('showSignup').hidden=false;message('');};
@@ -422,10 +443,48 @@ async function loadManagers(){
   buttons.append(toggle,remove);row.append(label,buttons);root.append(row);
  });
 }
+let reconciling=false;
+async function reconcileDrinkEvents(){
+ if(role!=='admin'||reconciling||writing)return;
+ reconciling=true;
+ try{
+  const snaps=await getDocs(collection(db,'drinkEvents'));
+  const todo=snaps.docs.filter(x=>!x.data().appliedAt).sort((a,b)=>(a.data().createdAt?.seconds||0)-(b.data().createdAt?.seconds||0));
+  let changed=false;
+  for(const event of todo){
+   try{
+    await runTransaction(db,async tx=>{
+     const [ev,st,profile]=await Promise.all([tx.get(event.ref),tx.get(stateRef),tx.get(doc(db,'managers',event.data().uid))]);
+     if(!ev.exists()||ev.data().appliedAt)return;
+     const d=ev.data(),payload=st.data()?.payload;
+     if(!payload||!V.validV6(payload))throw Error('Caisse indisponible');
+     if(!profile.exists()||profile.data().personId!==d.personId)throw Error('Association modifiée : intervention administrateur requise');
+     const dt=d.createdAt?.toDate?.();
+     if(!dt)throw Error('Date manquante');
+     const month=dt.toLocaleDateString('sv-SE',{timeZone:'Europe/Paris'}).slice(0,7);
+     const p=payload.people.find(x=>x.id===d.personId);
+     if(!p)throw Error('Fiche supprimée');
+     if(payload.closures.some(c=>c.month===month))throw Error('Mois clôturé');
+     const key=month+'|'+d.personId,updated=structuredClone(payload);
+     updated.drinks[key]=(Number(updated.drinks[key])||0)+d.quantity;
+     const next=st.data().revision+1;
+     tx.update(stateRef,{payload:updated,revision:next,updatedAt:serverTimestamp(),updatedBy:user.uid});
+     tx.update(event.ref,{appliedAt:serverTimestamp(),appliedBy:user.uid,appliedRevision:next});
+    });
+    changed=true;
+   }catch(e){console.warn('Consommation non intégrée',event.id,e);$('cloudStatus').textContent='Consommations à examiner : '+e.message}
+  }
+  if(changed){await refresh();await publishPersonalSnapshots()}
+ }finally{reconciling=false}
+}
+function watchDrinkEvents(){
+ if(adminDrinkUnsub)adminDrinkUnsub();
+ adminDrinkUnsub=onSnapshot(collection(db,'drinkEvents'),()=>{reconcileDrinkEvents().catch(e=>console.warn('Consolidation :',e))});
+}
 async function loadConsumptionQueue(){
  if(role!=='admin')return;
  const root=$('consumptionQueue');root.replaceChildren();
- const title=document.createElement('h3');title.textContent='Consommations à valider';root.append(title);
+ const title=document.createElement('h3');title.textContent='Anciennes demandes (avant V6.3)';root.append(title);
  const snaps=await getDocs(collection(db,'consumptionRequests'));
  const pending=snaps.docs.filter(s=>s.data().status==='pending').sort((a,b)=>(a.data().createdAt?.seconds||0)-(b.data().createdAt?.seconds||0));
  if(!pending.length){const p=document.createElement('p');p.textContent='Aucune consommation en attente.';root.append(p);return}
@@ -441,25 +500,11 @@ async function loadConsumptionQueue(){
     // Re-vérification de l'association actuelle pour éviter une validation après révocation.
     const profile=await getDoc(doc(db,'managers',req.uid));
     if(!profile.exists()||profile.data().active!==true||profile.data().personId!==req.personId)throw Error('Compte révoqué ou fiche modifiée.');
-    // Transaction unique : impossible de facturer deux fois une même demande.
-    await runTransaction(db,async tx=>{
-      const [ticket,caisse]=await Promise.all([tx.get(entry.ref),tx.get(stateRef)]);
-      if(!ticket.exists()||ticket.data().status!=='pending')throw Error('Demande déjà traitée.');
-      if(!caisse.exists()||!V.validV6(caisse.data().payload))throw Error('Caisse indisponible.');
-      const payload=structuredClone(caisse.data().payload);
-      if(!payload.people.some(p=>p.id===req.personId))throw Error('Fiche collègue introuvable.');
-      if(payload.closures.some(c=>c.month>=req.month))throw Error('Mois clôturé.');
-      if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(req.month)||req.month>new Date().toISOString().slice(0,7))throw Error('Mois invalide.');
-      const key=req.month+'|'+req.personId;
-      const previous=Number(payload.drinks[key]||0);
-      if(!Number.isSafeInteger(previous)||previous<0||previous>=10000)throw Error('Quantité invalide.');
-      payload.drinks[key]=previous+1;
-      const next=caisse.data().revision+1;
-      tx.update(stateRef,{revision:next,payload,updatedAt:serverTimestamp(),updatedBy:user.uid});
-      tx.update(entry.ref,{status:'approved',reviewedAt:serverTimestamp(),reviewedBy:user.uid});
-      tx.set(doc(collection(db,'audit')),{actor:user.uid,at:serverTimestamp(),revision:next,kind:'modification',summary:{people:payload.people.length,operations:payload.operations.length,packs:payload.packs.length}});
-    });
-    await refresh();await loadConsumptionQueue();
+    await refresh();
+    if(!V.canRecordDrink(req.month,req.personId))throw Error('Mois clôturé ou fiche inactive.');
+    await V.addPersonalDrink(req.month,req.personId,req.quantity);
+    await setDoc(entry.ref,{status:'approved',reviewedAt:serverTimestamp(),reviewedBy:user.uid},{merge:true});
+    await loadConsumptionQueue();
    }catch(e){alert('Validation impossible : '+e.message);approve.disabled=false;reject.disabled=false}
   };
   reject.onclick=async()=>{
@@ -505,8 +550,8 @@ onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=curren
  if(role==='manager'){
   const personId=profile.data().personId;
   if(typeof personId!=='string'||!personId)throw Error('Aucune fiche collègue associée à ce compte. Contacte un administrateur.');
-  V.wipeLocal();openPersonal(personId);message('');
+  openPersonal(personId);message('');
   return;
  }
- await refresh();$('managersPanel').hidden=role!=='admin';if(role==='admin')await Promise.all([loadManagers(),loadPendingRequests()]);unlock();message('');unsub=onSnapshot(stateRef,snap=>{if(!snap.exists()||writing)return;const d=snap.data();if(Number.isSafeInteger(d.revision)&&d.revision>revision){revision=d.revision;try{V.cloudLoad(d.payload,revision);if(role==='admin')publishPersonalSnapshots().catch(e=>console.warn('Publication des fiches personnelles :',e))}catch(e){alert(e.message)}}},err=>{lock();message('Synchronisation interrompue : '+err.message)})}catch(err){lock();message(err.message)}});
+ await refresh();$('managersPanel').hidden=role!=='admin';if(role==='admin')await Promise.all([loadManagers(),loadPendingRequests()]);unlock();if(role==='admin')watchDrinkEvents();message('');unsub=onSnapshot(stateRef,snap=>{if(!snap.exists()||writing)return;const d=snap.data();if(Number.isSafeInteger(d.revision)&&d.revision>revision){revision=d.revision;try{V.cloudLoad(d.payload,revision);if(role==='admin')publishPersonalSnapshots().catch(e=>console.warn('Publication des fiches personnelles :',e))}catch(e){alert(e.message)}}},err=>{lock();message('Synchronisation interrompue : '+err.message)})}catch(err){lock();message(err.message)}});
 </script></body></html>
