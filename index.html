@@ -315,6 +315,8 @@ const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app),V=window.pop
 const $=id=>document.getElementById(id),stateRef=doc(db,'caisse','principale');
 let user=null,unsub=null,personalUnsub=null,drinkUnsub=null,adminDrinkUnsub=null,revision=0,writing=false,role=null;
 let signupInProgress=false;
+let authPhase='Initialisation';
+function phase(label){authPhase=label;message(label);console.info('[POPOTTE connexion]',label)}
 // Identifiants techniques : aucune adresse e-mail personnelle n'est demandée.
 // Domaine réservé .invalid : ces adresses ne peuvent pas recevoir d'e-mails.
 // Les comptes historiques continuent de se connecter avec leur adresse e-mail.
@@ -410,9 +412,9 @@ $('authForm').addEventListener('submit',async e=>{
  try{
   const credential=await signInWithEmailAndPassword(auth,loginIdentifier($('authEmail').value),$('authPassword').value);
   completed=true;
-  message('Identité vérifiée. Chargement de ton espace…');
+  if($('authScreen').hidden===false && !authPhase.startsWith('Erreur') && !authPhase.startsWith('Lecture') && !authPhase.startsWith('Ouverture') && !authPhase.startsWith('Espace'))phase('Identité vérifiée. Attente de la vérification du compte…');
   // Un changement d'état Firebase doit suivre. On évite de rester sans indication.
-  setTimeout(()=>{if($('authScreen').hidden===false&&auth.currentUser?.uid===credential.user.uid&&$('authError').textContent.includes('Chargement de ton espace'))message('Connexion réussie, mais l’espace ne s’ouvre pas. Vérifie les autorisations Firestore et recharge la page.');},10000);
+  setTimeout(()=>{if($('authScreen').hidden===false&&auth.currentUser?.uid===credential.user.uid)phase('Diagnostic : '+authPhase+' (bloqué depuis plus de 10 secondes).');},10000);
  }catch(err){
   completed=true;
   message('Connexion impossible : '+(err.code||'')+' '+err.message);
@@ -561,14 +563,15 @@ async function loadPendingRequests(){
 }
 document.querySelector('[data-tab="settings"]').addEventListener('click',()=>{if(role==='admin')Promise.all([loadPendingRequests(),loadManagers(),loadConsumptionQueue()]).catch(err=>alert(err.message));});
 $('managerForm').addEventListener('submit',async e=>{e.preventDefault();const id=$('managerUid').value.trim(),r=$('managerRole').value;if(!/^[A-Za-z0-9]{10,128}$/.test(id)){alert('UID invalide');return}if(id===user.uid){alert('Ne modifie pas ton propre rôle ici');return}try{await setDoc(doc(db,'managers',id),{role:r,active:true});$('managerForm').reset();await loadManagers()}catch(err){alert('Autorisation impossible : '+err.message)}});
-onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=current;role=null;lock();if(!current){message('');return}message('Connexion établie. Vérification des autorisations…');try{const profile=await getDoc(doc(db,'managers',current.uid));if(!profile.exists()||profile.data().active!==true||!['admin','manager'].includes(profile.data().role)){const request=await getDoc(doc(db,'accessRequests',current.uid));throw Error(request.exists()?(request.data().status==='pending'?'Demande d’accès en attente de validation par un administrateur.':'Accès retiré ou désactivé. Contacte un administrateur.'):'Compte non autorisé. Contacte un administrateur.');}role=profile.data().role;
+onAuthStateChanged(auth,async current=>{if(unsub){unsub();unsub=null}user=current;role=null;lock();if(!current){message('');return}phase('Lecture du profil dans Firestore…');try{const profile=await getDoc(doc(db,'managers',current.uid));phase('Profil Firestore reçu. Vérification des droits…');if(!profile.exists()||profile.data().active!==true||!['admin','manager'].includes(profile.data().role)){const request=await getDoc(doc(db,'accessRequests',current.uid));throw Error(request.exists()?(request.data().status==='pending'?'Demande d’accès en attente de validation par un administrateur.':'Accès retiré ou désactivé. Contacte un administrateur.'):'Compte non autorisé. Contacte un administrateur.');}role=profile.data().role;
  $('connectedName').textContent=current.email?.endsWith('@users.popotte.invalid')?current.email.split('@')[0]:(current.email||'Compte connecté');
  $('connectedRole').textContent=role==='admin'?'· Administrateur':'· Utilisateur';
  if(role==='manager'){
+  phase('Ouverture de l’espace utilisateur…');
   const personId=profile.data().personId;
   if(typeof personId!=='string'||!personId)throw Error('Aucune fiche collègue associée à ce compte. Contacte un administrateur.');
-  openPersonal(personId);message('');
+  openPersonal(personId);phase('Espace utilisateur ouvert.');message('');
   return;
  }
- await refresh();$('managersPanel').hidden=role!=='admin';if(role==='admin')await Promise.all([loadManagers(),loadPendingRequests()]);unlock();if(role==='admin')watchDrinkEvents();message('');unsub=onSnapshot(stateRef,snap=>{if(!snap.exists()||writing)return;const d=snap.data();if(Number.isSafeInteger(d.revision)&&d.revision>revision){revision=d.revision;try{V.cloudLoad(d.payload,revision);if(role==='admin')publishPersonalSnapshots().catch(e=>console.warn('Publication des fiches personnelles :',e))}catch(e){alert(e.message)}}},err=>{lock();message('Synchronisation interrompue : '+err.message)})}catch(err){lock();message(err.message)}});
+ phase('Chargement de la caisse administrateur…');await refresh();$('managersPanel').hidden=role!=='admin';if(role==='admin')await Promise.all([loadManagers(),loadPendingRequests()]);unlock();if(role==='admin')watchDrinkEvents();message('');unsub=onSnapshot(stateRef,snap=>{if(!snap.exists()||writing)return;const d=snap.data();if(Number.isSafeInteger(d.revision)&&d.revision>revision){revision=d.revision;try{V.cloudLoad(d.payload,revision);if(role==='admin')publishPersonalSnapshots().catch(e=>console.warn('Publication des fiches personnelles :',e))}catch(e){alert(e.message)}}},err=>{lock();message('Synchronisation interrompue : '+err.message)})}catch(err){lock();phase('Erreur à l’étape « '+authPhase+' » : '+(err.code||'')+' '+err.message)}},err=>{lock();phase('Erreur de surveillance Firebase : '+err.message)});
 </script></body></html>
